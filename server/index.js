@@ -1,27 +1,50 @@
-// Load environment variables from .env file
-
 require("dotenv").config();
 
-// Check database connection
-// Note: This is optional and can be removed if the database connection
-// is not required when starting the application
+const mysql = require("mysql2/promise");
 
-require("./database/client").checkConnection();
+// Get variables from .env file for database connection
+const { DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME } = process.env;
 
-// Import the Express application from app/config.js
+class CategorySeeder {
+  constructor() {
+    // Create a connection pool to the database
+    this.databaseClient = mysql.createPool({
+      host: DB_HOST,
+      port: DB_PORT,
+      user: DB_USER,
+      password: DB_PASSWORD,
+      database: DB_NAME,
+    });
+  }
+  // Define the run method to seed the categories
 
-const app = require("./app/config");
+  async run() {
+    const categories = [{ name: "Science-Fiction" }, { name: "Comédie" }];
+    const insertPromises = categories.map((category) =>
+      this.databaseClient.query("INSERT INTO category (name) VALUES (?)", [
+        category.name,
+      ])
+    );
+    await Promise.all(insertPromises);
+    return categories;
+  }
+  // Define a method to close the connection pool
 
-// Get the port from the environment variables
+  async close() {
+    await this.databaseClient.end();
+  }
+}
 
-const port = process.env.APP_PORT;
+const createData = async () => {
+  try {
+    const categorySeeder = new CategorySeeder();
+    const categories = await categorySeeder.run();
+    await categorySeeder.close();
+    console.info(categories);
+  } catch (err) {
+    console.error("Error accessing the database:", err.message, err.stack);
+  }
+};
 
-// Start the server and listen on the specified port
-
-app
-  .listen(port, () => {
-    console.info(`Server is listening on port ${port}`);
-  })
-  .on("error", (err) => {
-    console.error("Error:", err.message);
-  });
+// Run the createData function
+createData();
